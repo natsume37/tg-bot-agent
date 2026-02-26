@@ -1,0 +1,18 @@
+[project]
+name = "tgbot"
+version = "0.1.0"
+description = "Add your description here"
+readme = "README.md"
+requires-python = "==3.11.*"
+dependencies = [
+	"httpx>=0.28.1",
+	"openai>=2.0.0",
+	"playwright>=1.54.0",
+	"pydantic-settings>=2.11.0",
+	"python-telegram-bot>=22.4",
+	"redis>=6.4.0",
+	"sqlalchemy>=2.0.43",
+	"asyncpg>=0.30.0",
+	"aiosqlite>=0.21.0",
+	"matplotlib>=3.10.0",
+]
