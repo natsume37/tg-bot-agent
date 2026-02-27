@@ -2,6 +2,7 @@ from __future__ import annotations
 
 from collections import defaultdict
 from datetime import datetime, timedelta
+import json
 import logging
 from pathlib import Path
 from typing import Any
@@ -48,6 +49,9 @@ class AnalyticsService:
                 break
 
         if not selected:
+            selected = self._pick_font_from_fc_match()
+
+        if not selected:
             selected = self._pick_font_from_fc_list()
 
         if selected:
@@ -60,6 +64,27 @@ class AnalyticsService:
             logger.warning("No configured CJK font found; fallback to DejaVu Sans")
 
         plt.rcParams["axes.unicode_minus"] = False
+
+    def _pick_font_from_fc_match(self) -> str | None:
+        try:
+            matched_path = subprocess.check_output(["fc-match", "-f", "%{file}", ":lang=zh"], text=True).strip()
+        except Exception:
+            return None
+
+        if not matched_path:
+            return None
+        path = Path(matched_path)
+        if not path.exists():
+            return None
+        try:
+            font_manager.fontManager.addfont(str(path))
+            name = font_manager.FontProperties(fname=str(path)).get_name()
+            if name:
+                logger.info("Analytics font selected from fc-match: %s (%s)", name, path)
+                return name
+        except Exception:
+            return None
+        return None
 
     def _pick_font_from_fc_list(self) -> str | None:
         try:
@@ -143,7 +168,7 @@ class AnalyticsService:
 
         selected = set(chart_types or ["all"])
         if "all" in selected:
-            selected = {"category_bar", "category_pie", "daily_trend", "top_expenses"}
+            selected = {"category_bar", "category_pie", "daily_trend", "top_expenses", "interactive_html"}
 
         charts: list[dict[str, Any]] = []
         folder = self.output_dir / user_id
@@ -158,6 +183,8 @@ class AnalyticsService:
             charts.append(self._draw_daily_trend(records, folder / f"{timestamp}_daily_trend.png"))
         if "top_expenses" in selected:
             charts.append(self._draw_top_expenses(records, folder / f"{timestamp}_top_expenses.png"))
+        if "interactive_html" in selected:
+            charts.append(self._draw_interactive_html(records, folder / f"{timestamp}_interactive.html"))
 
         return {
             "count": len(records),
@@ -182,9 +209,9 @@ class AnalyticsService:
 
         plt.figure(figsize=(8, 5))
         plt.bar(names, values)
-        plt.title("Expense by Category")
-        plt.xlabel("Category")
-        plt.ylabel("Amount")
+        plt.title("按分类消费统计")
+        plt.xlabel("分类")
+        plt.ylabel("金额")
         plt.tight_layout()
         plt.savefig(output)
         plt.close()
@@ -197,7 +224,7 @@ class AnalyticsService:
 
         plt.figure(figsize=(7, 7))
         plt.pie(by_category.values(), labels=by_category.keys(), autopct="%1.1f%%", startangle=90)
-        plt.title("Expense Category Share")
+        plt.title("消费分类占比")
         plt.tight_layout()
         plt.savefig(output)
         plt.close()
@@ -212,9 +239,9 @@ class AnalyticsService:
 
         plt.figure(figsize=(9, 5))
         plt.plot(days, values, marker="o")
-        plt.title("Daily Expense Trend")
-        plt.xlabel("Date")
-        plt.ylabel("Amount")
+        plt.title("每日消费趋势")
+        plt.xlabel("日期")
+        plt.ylabel("金额")
         plt.xticks(rotation=35)
         plt.tight_layout()
         plt.savefig(output)
@@ -228,9 +255,83 @@ class AnalyticsService:
 
         plt.figure(figsize=(10, 6))
         plt.barh(labels[::-1], values[::-1])
-        plt.title("Top Expenses")
-        plt.xlabel("Amount")
+        plt.title("高额消费 Top10")
+        plt.xlabel("金额")
         plt.tight_layout()
         plt.savefig(output)
         plt.close()
         return {"type": "top_expenses", "path": str(output)}
+
+    def _draw_interactive_html(self, records, output: Path) -> dict[str, Any]:
+        by_category: dict[str, float] = defaultdict(float)
+        by_day: dict[str, float] = defaultdict(float)
+        for row in records:
+            by_category[row.category] += float(row.amount)
+            by_day[row.spent_at.strftime("%Y-%m-%d")] += float(row.amount)
+
+        categories = list(by_category.keys())
+        category_values = [round(by_category[name], 2) for name in categories]
+        trend_days = sorted(by_day.keys())
+        trend_values = [round(by_day[day], 2) for day in trend_days]
+
+        html_content = f"""<!doctype html>
+<html lang=\"zh-CN\">
+<head>
+    <meta charset=\"UTF-8\" />
+    <meta name=\"viewport\" content=\"width=device-width, initial-scale=1.0\" />
+    <title>消费动态仪表盘</title>
+    <script src=\"https://cdn.jsdelivr.net/npm/echarts@5/dist/echarts.min.js\"></script>
+    <style>
+        body {{ font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', 'Noto Sans CJK SC', 'Microsoft YaHei', sans-serif; margin: 0; background: #f7f8fa; }}
+        .container {{ max-width: 1100px; margin: 24px auto; padding: 0 12px; }}
+        .card {{ background: #fff; border-radius: 10px; padding: 12px; margin-bottom: 14px; box-shadow: 0 2px 8px rgba(0,0,0,0.05); }}
+        .title {{ margin: 8px 0 12px; font-size: 18px; font-weight: 600; }}
+        .chart {{ width: 100%; height: 420px; }}
+    </style>
+</head>
+<body>
+    <div class=\"container\">
+        <div class=\"card\">
+            <div class=\"title\">消费分类（可缩放 / 悬停）</div>
+            <div id=\"categoryChart\" class=\"chart\"></div>
+        </div>
+        <div class=\"card\">
+            <div class=\"title\">每日消费趋势（可缩放 / 悬停）</div>
+            <div id=\"trendChart\" class=\"chart\"></div>
+        </div>
+    </div>
+    <script>
+        const categories = {json.dumps(categories, ensure_ascii=False)};
+        const categoryValues = {json.dumps(category_values, ensure_ascii=False)};
+        const trendDays = {json.dumps(trend_days, ensure_ascii=False)};
+        const trendValues = {json.dumps(trend_values, ensure_ascii=False)};
+
+        const categoryChart = echarts.init(document.getElementById('categoryChart'));
+        categoryChart.setOption({{
+            tooltip: {{ trigger: 'axis' }},
+            xAxis: {{ type: 'category', data: categories, axisLabel: {{ rotate: 25 }} }},
+            yAxis: {{ type: 'value', name: '金额' }},
+            dataZoom: [{{ type: 'inside' }}, {{ type: 'slider' }}],
+            series: [{{ type: 'bar', data: categoryValues, itemStyle: {{ borderRadius: [6, 6, 0, 0] }} }}]
+        }});
+
+        const trendChart = echarts.init(document.getElementById('trendChart'));
+        trendChart.setOption({{
+            tooltip: {{ trigger: 'axis' }},
+            xAxis: {{ type: 'category', data: trendDays, axisLabel: {{ rotate: 25 }} }},
+            yAxis: {{ type: 'value', name: '金额' }},
+            dataZoom: [{{ type: 'inside' }}, {{ type: 'slider' }}],
+            series: [{{ type: 'line', data: trendValues, smooth: true, symbol: 'circle', symbolSize: 7 }}]
+        }});
+
+        window.addEventListener('resize', () => {{
+            categoryChart.resize();
+            trendChart.resize();
+        }});
+    </script>
+</body>
+</html>
+"""
+
+        output.write_text(html_content, encoding="utf-8")
+        return {"type": "interactive_html", "path": str(output)}

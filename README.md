@@ -75,7 +75,7 @@ LLM_PROVIDER=heuristic
 PostgreSQL 默认配置示例：
 
 ```env
-DATABASE_URL=postgresql+asyncpg://postgres:postgres@localhost:5432/tgbot
+DATABASE_URL=postgresql+asyncpg://<username>:<password>@<host>:<port>/<database>
 ```
 
 ## 4. 初始化数据库
@@ -93,6 +93,12 @@ uv python install 3.11
 uv sync
 uv run playwright install chromium
 uv run python main.py
+```
+
+如果你是第一次在本机使用 `uv`，可先执行：
+
+```bash
+uv venv
 ```
 
 ## 6. Google 搜索与网页截图（AI 意图识别）
@@ -138,6 +144,22 @@ uv run python main.py
 
 ```bash
 tail -f logs/app.log
+```
+
+## 12. 常用 uv 命令
+
+```bash
+# 安装/更新依赖
+uv sync
+
+# 初始化数据库
+uv run python -m scripts.init_db
+
+# 启动 Bot
+uv run python main.py
+
+# 运行测试（若项目有测试）
+uv run pytest
 ```
 
 重点关注以下日志：

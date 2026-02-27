@@ -36,6 +36,25 @@ def create_web_handlers(service: WebService, config_service: UserConfigService |
             return MCPToolResult(success=True, data=data, message="未找到搜索结果")
         return MCPToolResult(success=True, data=data, message="Google 搜索完成")
 
+    async def deep_web_search(_user_id: str, arguments: dict) -> MCPToolResult:
+        query = str(arguments.get("query", "")).strip()
+        if not query:
+            return MCPToolResult(success=False, message="query 不能为空")
+
+        per_query_limit = parse_int(arguments.get("per_query_limit", 4), default=4, min_value=1, max_value=8)
+        max_sources = parse_int(arguments.get("max_sources", 8), default=8, min_value=1, max_value=12)
+        language = str(arguments.get("language", "zh-CN")).strip() or "zh-CN"
+
+        data = await service.deep_web_search(
+            query=query,
+            language=language,
+            per_query_limit=per_query_limit,
+            max_sources=max_sources,
+        )
+        if data.get("count", 0) == 0:
+            return MCPToolResult(success=True, data=data, message="深度搜索未命中结果")
+        return MCPToolResult(success=True, data=data, message="深度搜索完成")
+
     async def capture_website_screenshot(user_id: str, arguments: dict) -> MCPToolResult:
         url = str(arguments.get("url", "")).strip()
         if not url:
@@ -69,5 +88,6 @@ def create_web_handlers(service: WebService, config_service: UserConfigService |
 
     return {
         "google_search": google_search,
+        "deep_web_search": deep_web_search,
         "capture_website_screenshot": capture_website_screenshot,
     }

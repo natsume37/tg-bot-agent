@@ -93,7 +93,7 @@ TOOL_DEFINITIONS: list[MCPToolDefinition] = [
                 "chart_types": {
                     "type": "array",
                     "items": {"type": "string"},
-                    "description": "可选: category_bar,category_pie,daily_trend,top_expenses,all",
+                    "description": "可选: category_bar,category_pie,daily_trend,top_expenses,interactive_html,all",
                 },
             },
             required=[],
@@ -172,6 +172,19 @@ TOOL_DEFINITIONS: list[MCPToolDefinition] = [
                 "query": {"type": "string"},
                 "limit": {"type": "integer"},
                 "language": {"type": "string", "description": "语言代码，如 zh-CN,en"},
+            },
+            required=["query"],
+        ),
+    ),
+    MCPToolDefinition(
+        name="deep_web_search",
+        description="对主题进行深度网页检索：多轮查询并抓取页面摘要，适合需要深入调研的请求",
+        input_schema=MCPToolInputSchema(
+            properties={
+                "query": {"type": "string"},
+                "language": {"type": "string", "description": "语言代码，如 zh-CN,en"},
+                "per_query_limit": {"type": "integer", "description": "每轮查询抓取的搜索结果数量"},
+                "max_sources": {"type": "integer", "description": "最终聚合的来源数量上限"},
             },
             required=["query"],
         ),

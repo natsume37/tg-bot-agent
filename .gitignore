@@ -5,19 +5,32 @@ build/
 dist/
 wheels/
 *.egg-info
+.pytest_cache/
+.mypy_cache/
+.ruff_cache/
+.coverage
+htmlcov/
 
 # Virtual environments
 .venv
+venv/
 
 # Environment variables
 .env
+.env.*
+!.env.example
 
 # IDE
 .idea/
+.vscode/
+
+# OS files
+.DS_Store
 
 # Logs & outputs
 logs/
 outputs/
+*.log
 
 # uv lock
 uv.lock

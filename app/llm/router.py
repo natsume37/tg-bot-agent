@@ -126,10 +126,11 @@ class LLMRouter:
             "6) 当用户要求图表/可视化时调用 visualize_expenses，并可设置 chart_types。"
             "7) 用户要求配置时调用 set_user_config/get_user_config/list_user_configs/delete_user_config。"
             "8) 用户提供图片URL并要求分析时调用 analyze_image。"
-            "9) 当用户有网页搜索意图时调用 google_search。"
-            "10) 当用户有网页截图意图时调用 capture_website_screenshot。"
-            "11) 调用工具时参数尽量完整准确。"
-            "12) 输出风格要清晰好看：使用短段落、项目符号和少量emoji。"
+            "9) 当用户要求深入调研、深度搜索、多来源对比时优先调用 deep_web_search。"
+            "10) 普通网页搜索意图调用 google_search。"
+            "11) 当用户有网页截图意图时调用 capture_website_screenshot。"
+            "12) 调用工具时参数尽量完整准确。"
+            "13) 输出风格要清晰好看：使用短段落、项目符号和少量emoji。"
         )
 
     def build_user_prompt(self, message: str, context: MCPContext) -> str:
@@ -168,6 +169,22 @@ class LLMRouter:
             return {
                 "content": "",
                 "tool_calls": [{"id": "heuristic-viz", "name": "visualize_expenses", "arguments": args, "raw_arguments": json.dumps(args, ensure_ascii=False)}],
+            }
+
+        if any(word in lowered for word in ["深度", "深入", "调研", "research", "对比"]) and any(
+            word in lowered for word in ["搜索", "查", "资料", "信息"]
+        ):
+            args = {"query": message, "per_query_limit": 4, "max_sources": 8}
+            return {
+                "content": "",
+                "tool_calls": [{"id": "heuristic-deep-search", "name": "deep_web_search", "arguments": args, "raw_arguments": json.dumps(args, ensure_ascii=False)}],
+            }
+
+        if any(word in lowered for word in ["搜索", "查一下", "帮我查", "google", "谷歌"]) and "天气" not in lowered:
+            args = {"query": message, "limit": 5}
+            return {
+                "content": "",
+                "tool_calls": [{"id": "heuristic-google-search", "name": "google_search", "arguments": args, "raw_arguments": json.dumps(args, ensure_ascii=False)}],
             }
 
         if any(word in lowered for word in ["分析", "消费分析", "开销分析", "统计"]):

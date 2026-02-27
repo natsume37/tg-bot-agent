@@ -18,6 +18,7 @@ class Settings(BaseSettings):
     sql_echo: bool = False
 
     telegram_bot_token: str = ""
+    telegram_message_timeout_seconds: int = 45
 
     llm_provider: str = "heuristic"
     llm_api_key: str = ""

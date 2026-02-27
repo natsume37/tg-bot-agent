@@ -16,7 +16,11 @@ def main() -> None:
         raise RuntimeError("请先在 .env 中配置 TELEGRAM_BOT_TOKEN")
 
     container = Container(settings)
-    gateway = TelegramGateway(token=settings.telegram_bot_token, runtime_builder=container.build_runtime)
+    gateway = TelegramGateway(
+        token=settings.telegram_bot_token,
+        runtime_builder=container.build_runtime,
+        message_timeout_seconds=settings.telegram_message_timeout_seconds,
+    )
     gateway.start()
 
 
